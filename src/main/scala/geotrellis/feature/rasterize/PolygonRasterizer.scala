@@ -11,29 +11,34 @@ object PolygonRasterizer {
    */
   def foreachCellByPolygon[D](p:Polygon[D], re:RasterExtent, f:(Int,Int,Polygon[D]) => Unit, includeExterior:Boolean = false) {
 
-    // Create a global edge table which tracks the minimum and maximum row 
-    // for which each edge is relevant.
-    val edgeTable = buildEdgeTable(p, re)
-    val activeEdgeTable = ActiveEdgeTable.empty
 
-    // Process each row in the raster that intersects with the polygon.
-    for(row <- edgeTable.rowMin to edgeTable.rowMax) {
+    if (p.geom.getExteriorRing.getCoordinates.length > 2) {
+      
+      // Create a global edge table which tracks the minimum and maximum row 
+      // for which each edge is relevant.
+      val edgeTable = buildEdgeTable(p, re)
 
-     // Update our active edge table to reflect the current row.
-     activeEdgeTable.update(row, edgeTable, re)
-     
-    // activeEdgeTable.updateIntercepts(row, re)
+      val activeEdgeTable = ActiveEdgeTable.empty
+
+      // Process each row in the raster that intersects with the polygon.
+      for(row <- edgeTable.rowMin to edgeTable.rowMax) {
+
+       // Update our active edge table to reflect the current row.
+       activeEdgeTable.update(row, edgeTable, re)
+       
+      // activeEdgeTable.updateIntercepts(row, re)
 
 
-      //TODO: exclude col0 & col1
-      // call function on included cells
-      val fillRanges = activeEdgeTable.fillRanges(row,includeExterior)
-      val cellRanges = processRanges(fillRanges)
-      for ( (col0, col1) <- cellRanges;
-            col          <- col0 to col1
-      ) f(col,row,p)
+        //TODO: exclude col0 & col1
+        // call function on included cells
+        val fillRanges = activeEdgeTable.fillRanges(row,includeExterior)
+        val cellRanges = processRanges(fillRanges)
+        for ( (col0, col1) <- cellRanges;
+              col          <- col0 to col1
+        ) f(col,row,p)
 
-      activeEdgeTable.dropEdges(row)
+        activeEdgeTable.dropEdges(row)
+      }
     }
   }
 
@@ -167,21 +172,36 @@ object PolygonRasterizer {
 
   def buildEdgeTable(p:Polygon[_], re:RasterExtent) = {
     val geom = p.geom 
-    val lines = geom.getExteriorRing.getCoordinates.sliding(2).flatMap {  
+    val lineCoords = geom.getExteriorRing.getCoordinates
+    val lines1 = lineCoords.sliding(2)
+
+    val lines = lines1.flatMap {  
       case Array(c1,c2) => Line.create(c1,c2,re)
+      case Array(c1,c2,c3) => Line.create(c1,c2,re)
+      case y @ _ => throw new Exception("line coords are unexpected: " + y)
     }.toList
 
-    val rowMin = lines.map( _.rowMin ).reduceLeft( math.min(_, _) ) 
-    val rowMax = lines.map( _.rowMax ).reduceLeft( math.max(_, _) ) 
-
     var map = Map[Int,List[Line]]()
-    for(line <- lines) {
-      // build lists of lines by starting row
-      val linelist = map.get(line.rowMin)
-                        .getOrElse(List[Line]())
-      map += (line.rowMin -> (linelist :+ line))
+    if (lines.length == 0) { 
+      println("lineCoords, 2: " + lineCoords)
+      lineCoords.foreach{ x => println(x.toString) }
+      println("count: " + lineCoords.length)
+        val lines1 = lineCoords.sliding(2)
+      println("lines1: " + lines1.length )
+      EdgeTable(map, Int.MaxValue, Int.MinValue)
+      //throw new Exception("no exterior ring found") 
+    } else {
+      val rowMin = lines.map( _.rowMin ).reduceLeft( math.min(_, _) ) 
+      val rowMax = lines.map( _.rowMax ).reduceLeft( math.max(_, _) ) 
+
+      for(line <- lines) {
+        // build lists of lines by starting row
+        val linelist = map.get(line.rowMin)
+                          .getOrElse(List[Line]())
+        map += (line.rowMin -> (linelist :+ line))
+      }
+      EdgeTable(map,rowMin,rowMax)
     }
-    EdgeTable(map,rowMin,rowMax)
   }
   
 }

@@ -28,7 +28,6 @@ case class TiledPolygonalZonalCount[D](p: Polygon[D], override val r: Op[Raster]
   r =>
     {
       val r2 = r.force
-      println("tile is: " + r2)
       val s: Long = r2.data match {
         case x: IntConstant if x.n == NODATA => { // TODO: test for NODATA 
           //println("empty tile")
@@ -65,9 +64,8 @@ case class TiledPolygonalZonalCount[D](p: Polygon[D], override val r: Op[Raster]
             }
             var sum: Long = 0L
             val f = (col:Int, row:Int, p:Polygon[Unit]) => { 
-              println("executing %d, %d, %s".format(col,row, r2))
               val z = r2.get(col,row)
-              if (z != NODATA) { sum = sum + z; println("value!  %d".format(z) ) } 
+              if (z != NODATA) { sum = sum + z } 
             }
             geotrellis.feature.rasterize.PolygonRasterizer.foreachCellByPolygon(
               p2,
@@ -77,7 +75,6 @@ case class TiledPolygonalZonalCount[D](p: Polygon[D], override val r: Op[Raster]
           }
         }
       }
-      println("tile result is: " + s)
       s
       //var histmap = Array.ofDim[Int](1)
     }

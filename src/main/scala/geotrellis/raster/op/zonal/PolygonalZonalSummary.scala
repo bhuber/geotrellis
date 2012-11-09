@@ -35,7 +35,11 @@ object TiledPolygonalZonalSum {
     sum
   }
 
-  val reducer =  (ints:List[Long]) => ints.reduceLeft((x, y) => x + y)
+  val reducer =  (ints:List[Long]) => ints.length match {
+    case 0 => 0L
+    case 1 => ints.head
+    case _ => ints.reduceLeft((x, y) => x + y)
+  }
 
   def apply[D](p: Polygon[D], r: Op[Raster], tileSums:Map[RasterExtent,Long] = Map(), threshold:Int = 30) = {
     val f = (r2:Raster, polygon:Polygon[D]) => {
