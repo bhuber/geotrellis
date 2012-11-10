@@ -60,7 +60,7 @@ object TiledPolygonalZonalSum {
 }
 
 object TiledPolygonalZonalSummary2 {
-  def apply[R:Manifest, Z:Manifest, D](p: Polygon[D], r: Op[Raster], f:(Raster,Polygon[D]) => R, g:(Raster) => R, empty:R, reducer:List[R] => Z, tileResults:Map[RasterExtent,R] = Map(), threshold:Int = 30):Op[Z]= {
+  def apply[R:Manifest, Z:Manifest, D](p: Polygon[D], r: Op[Raster], f:(Raster,Polygon[D]) => R, g:(Raster) => R, empty:R, reducer:List[R] => R, tileResults:Map[RasterExtent,R] = Map(), threshold:Int = 30):Op[R]= {
   raster.op.tiles.ThoroughputLimitedReducer1(r, threshold)({ r =>
     {
       val r2 = r.force
@@ -81,17 +81,26 @@ object TiledPolygonalZonalSummary2 {
             val tilePolygonOrig = jtsPolygon.intersection(jtsExtent)
             //val tilePolygon = com.vividsolutions.jts.simplify.TopologyPreservingSimplifier.simplify(tilePolygonOrig, r.rasterExtent.cellwidth)
             val rasterExtent = r.rasterExtent
-            val p2 = tilePolygonOrig match {
+            val result:R = tilePolygonOrig match {
               case t: com.vividsolutions.jts.geom.Polygon => {
                 val pp = geotrellis.feature.Polygon(t, p.data)
-            	  pp
+                f(r2,pp)
+              }
+              case m: com.vividsolutions.jts.geom.MultiPolygon => {
+                val n = m.getNumGeometries()
+                val polygons = for( i <- 0 until n) yield {
+                  geotrellis.feature.Polygon(
+                    m.getGeometryN(i), 
+                    p.data)
+                }
+                val results = (polygons.map { f(r2, _) }).toList 
+                reducer(results)
               }
               case x => {
-                throw new Exception("tilePolygon is: " + x)
-                null
+                empty
               }
             }
-            f(r2,p2)
+            result
           } 
         }
       }
