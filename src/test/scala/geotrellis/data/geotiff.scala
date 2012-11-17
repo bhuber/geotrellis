@@ -126,5 +126,31 @@ class GeoTiffSpec extends FunSpec with MustMatchers with ShouldMatchers {
       Encoder.writePath("/tmp/lzw-sbn.tif", r, Settings(ByteSample, Signed, false, Lzw))
       Encoder.writePath("/tmp/raw-sbn.tif", r, Settings(ByteSample, Signed, false, Uncompressed))
     }
+
+    it ("shouldn't take forever to compress a bunch of zeros") {
+      import geotiff._
+
+      def getTime(f: Unit => Any): Long = {
+        val start = System.nanoTime
+        f()
+        (System.nanoTime - start)
+      }
+      
+      val cols = 1000
+      val rows = 1000
+
+      val e = Extent(10.0, 20.0, 10.0 + cols, 20.0 + rows)
+      val re = RasterExtent(e, 1.0, 1.0, cols, rows)
+      val data = ByteArrayRasterData((0 to rows * cols).map(_ => 0.toByte).toArray, rows, cols)
+      val r = Raster(data, re)
+
+      val tLzw = getTime(_ =>
+        Encoder.writePath("/tmp/lzw-zeros.tif", r, Settings(ByteSample, Signed, false, Lzw)))
+      val tRaw = getTime(_ =>
+        Encoder.writePath("/tmp/raw-zeros.tif", r, Settings(ByteSample, Signed, false, Uncompressed)))
+
+      // It shouldn't take 10x longer to write a compressed version of the raster
+      assert(10 * tRaw > tLzw, "tRaw: %d, tLzw: %d".format(tRaw, tLzw))
+    }
   }
 }
