@@ -25,7 +25,7 @@ object VString {
   }
 }
 
-class VString(val internal: Vector[Char]) {
+class VString(val internal: Vector[Char]) extends scala.math.Ordered[VString] {
   def ++(that: TraversableOnce[Char]): VString = {
     val vb = new VectorBuilder[Char]()
     vb ++= internal
@@ -34,7 +34,30 @@ class VString(val internal: Vector[Char]) {
   }
 
   def +(c: Char): VString = new VString(internal :+ c)
+
+  override def hashCode(): Int = _hashCode
+
+  val _hashCode = internal.##
+
+  override def equals(that: Any): Boolean = that match {
+    case that: VString => internal == that.internal
+    case _ => false
+  }
+
+  override def toString: String = {
+    val sb = new StringBuilder()
+    sb ++= internal
+    sb.toString
+  }
+
+  override def compare(that: VString): Int = this.toString.compare(that.toString)
 }
+
+object VStringConversions {
+  implicit def SToVS(that: String): VString = VString(that)
+}
+
+import VStringConversions._
 
 /**
  * Implements LZW compression encoding.
@@ -143,10 +166,10 @@ abstract class LzwEncoder(encoder:Encoder) {
   val dmg = new DataOutputStream(encoder.img)
 
   // the table mapping strings to LZW codes
-  var stringTable:mutable.Map[String, Int] = null
+  var stringTable:mutable.Map[VString, Int] = null
 
   // the current input byte, as named in the TIFF 6.0 LZW section
-  var omega:String = ""
+  var omega:VString = VString("")
 
   // the number of bits we're currently using for LZW codes (ranges 9-12)
   var codeBits:Int = 0
@@ -168,7 +191,7 @@ abstract class LzwEncoder(encoder:Encoder) {
   // offset stores the current number of bytes we've output
   var offset = 0
 
-  def xyz(o:String) = o.map(_.toInt)
+  def xyz(o:VString) = o.internal.map(_.toInt)
 
   /**
    * Reinitializes all state related to the string table. After this happens
@@ -179,7 +202,7 @@ abstract class LzwEncoder(encoder:Encoder) {
    * string table (i.e. once 4094 has been added).
    */
   def initStringTable() {
-    stringTable = mutable.Map.empty[String, Int]
+    stringTable = mutable.Map.empty[VString, Int]
     for (i <- 0 until 256) stringTable(i.toChar.toString) = i
     nextCode = 258
     nextLimit = 512
@@ -189,14 +212,14 @@ abstract class LzwEncoder(encoder:Encoder) {
   /**
    * Test if the given string is available in the table.
    */
-  def hasCode(s:String): Boolean = stringTable.contains(s)
+  def hasCode(s:VString): Boolean = stringTable.contains(s)
 
   /**
    * Retrieve the given string from the string table.
    *
    * This method will crash if the string can't be found.
    */
-  def getCode(s:String): Int = {
+  def getCode(s:VString): Int = {
     if (!stringTable.contains(s)) {
       println("no code found for %s" format xyz(s))
       stringTable.toList.sorted.foreach {
@@ -213,7 +236,7 @@ abstract class LzwEncoder(encoder:Encoder) {
    * If the string table fills up, this method will write out omega (as a
    * 12-bit code) and then reset the string table and omega.
    */
-  def addCode(str:String) {
+  def addCode(str:VString) {
     val code = nextCode
     stringTable(str) = code
     nextCode += 1
@@ -227,7 +250,7 @@ abstract class LzwEncoder(encoder:Encoder) {
     }
   }
 
-  def setOmega(s:String) { omega = s }
+  def setOmega(s:VString) { omega = s }
 
   /**
    * Process a single cell of raster data according to LZW.
@@ -249,7 +272,7 @@ abstract class LzwEncoder(encoder:Encoder) {
       setOmega(s)
     } else {
       writeCode(getCode(omega))
-      setOmega(c.toString)
+      setOmega(new VString(Vector(c)))
       addCode(s)
     }
   }
