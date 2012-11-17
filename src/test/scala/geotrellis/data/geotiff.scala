@@ -150,7 +150,7 @@ class GeoTiffSpec extends FunSpec with MustMatchers with ShouldMatchers {
         Encoder.writePath("/tmp/raw-zeros.tif", r, Settings(ByteSample, Signed, false, Uncompressed)))
 
       // It shouldn't take 10x longer to write a compressed version of the raster
-      assert(10 * tRaw > tLzw, "tRaw: %d, tLzw: %d".format(tRaw, tLzw))
+      assert(10 * tRaw > tLzw, "tRaw: %d, tLzw: %d, ratio: %f".format(tRaw, tLzw, tLzw.toDouble / tRaw)
     }
   }
 }
