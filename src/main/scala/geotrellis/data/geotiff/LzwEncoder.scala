@@ -14,6 +14,28 @@ import scala.math.{ceil, min}
 
 import geotrellis._
 
+import collection.immutable.{VectorBuilder,Vector,StringLike}
+import collection.GenTraversableOnce
+
+object VString {
+  def apply(s: String): VString = {
+    val vb = new VectorBuilder[Char]()
+    vb ++= s
+    new VString(vb.result)
+  }
+}
+
+class VString(val internal: Vector[Char]) {
+  def ++(that: TraversableOnce[Char]): VString = {
+    val vb = new VectorBuilder[Char]()
+    vb ++= internal
+    vb ++= that
+    new VString(vb.result)
+  }
+
+  def +(c: Char): VString = new VString(internal :+ c)
+}
+
 /**
  * Implements LZW compression encoding.
  *
